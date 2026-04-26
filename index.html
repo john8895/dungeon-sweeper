@@ -56,34 +56,68 @@ h1 {
   flex-shrink: 0;
 }
 
-#lvup-btn {
-  background: #2a6a10;
-  border: 2px solid #60e030;
-  border-radius: 4px;
-  padding: 4px 12px;
-  font-size: 14px;
-  font-weight: bold;
-  color: #e0ffc0;
-  white-space: nowrap;
+#player-avatar-wrap {
+  position: relative;
   flex-shrink: 0;
-  cursor: pointer;
-  animation: lvup-pulse 0.8s ease-in-out infinite alternate;
 }
-#lvup-btn:hover { background: #3a8a18; }
-@keyframes lvup-pulse {
-  0%   { box-shadow: 0 0 4px rgba(96,224,48,0.3); }
-  100% { box-shadow: 0 0 12px rgba(96,224,48,0.7); }
+#player-avatar {
+  font-size: 40px;
+  line-height: 1;
+  cursor: default;
+  border-radius: 6px;
+  padding: 2px 6px;
+  display: block;
+}
+#player-avatar.can-lvup {
+  cursor: pointer;
+  animation: avatar-pulse 0.8s ease-in-out infinite alternate;
+}
+#player-avatar.can-lvup:hover {
+  filter: brightness(1.3);
+}
+@keyframes avatar-pulse {
+  0%   { text-shadow: 0 0 6px rgba(96,224,48,0.4); }
+  100% { text-shadow: 0 0 18px rgba(96,224,48,0.9), 0 0 30px rgba(96,224,48,0.4); }
+}
+#lvup-hint {
+  display: none;
+  position: absolute;
+  top: -20px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 11px;
+  font-weight: bold;
+  color: #60e030;
+  white-space: nowrap;
+  animation: hint-fade 1.2s ease-in-out infinite;
+  pointer-events: none;
+}
+@keyframes hint-fade {
+  0%, 100% { opacity: 0.3; }
+  50%      { opacity: 1; }
 }
 
-#hearts-wrap { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+#hearts-wrap { display: flex; gap: 2px; flex-wrap: wrap; align-items: center; }
 
 .heart-icon {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   font-size: 55px;
   line-height: 1;
   transition: opacity 0.2s;
 }
 .heart-icon.full { color: #e03030; }
 .heart-icon.empty { color: #3a2018; }
+.heart-icon .heart-num {
+  position: absolute;
+  font-size: 13px;
+  font-weight: bold;
+  font-family: monospace;
+  color: #fff;
+  text-shadow: 0 1px 2px rgba(0,0,0,0.8);
+}
 
 #xp-row {
   display: flex;
@@ -479,17 +513,17 @@ h1 {
 <div id="diff-menu">
   <h2>Select Difficulty</h2>
   <div id="diff-btns">
-    <button class="diff-btn" onclick="startWithDiff('easy')">Easy<small>HP 7 · Boss 6</small></button>
-    <button class="diff-btn" onclick="startWithDiff('normal')">Normal<small>HP 5 · Boss 8</small></button>
-    <button class="diff-btn" onclick="startWithDiff('hard')">Hard<small>HP 4 · Boss 10</small></button>
+    <button class="diff-btn" onclick="startWithDiff('easy')">Easy<small>HP 5 · Boss 8</small></button>
+    <button class="diff-btn" onclick="startWithDiff('normal')">Normal<small>HP 4 · Boss 10</small></button>
+    <button class="diff-btn" onclick="startWithDiff('hard')">Hard<small>HP 3 · Boss 12</small></button>
   </div>
   <div id="menu-lb"></div>
 </div>
 
 <div id="hud">
   <div id="xp-row">
+    <div id="player-avatar-wrap"><span id="lvup-hint">▲ Level Up</span><span id="player-avatar" onclick="doLevelUp()">🧙</span></div>
     <div id="lv-badge">Lv.1</div>
-    <div id="lvup-btn" style="display:none" onclick="doLevelUp()">Level Up!</div>
     <div id="xp-label">0 / 3 XP</div>
     <div id="xp-stars"></div>
   </div>
@@ -531,9 +565,9 @@ h1 {
   ];
 
   var DIFFICULTIES = {
-    easy:   { hp: 7, bossHP: 6, monsters: [2, 3, 5, 5, 5, 5, 5], items: [6, 5, 4], label: 'Easy' },
-    normal: { hp: 5, bossHP: 8, monsters: [3, 5, 7, 6, 6, 5, 5], items: [5, 4, 3], label: 'Normal' },
-    hard:   { hp: 4, bossHP: 10, monsters: [4, 6, 8, 7, 7, 4, 4], items: [4, 3, 2], label: 'Hard' }
+    easy:   { hp: 5, bossHP: 8,  monsters: [3, 5, 7, 6, 6, 5, 5], items: [4, 3, 2], label: 'Easy' },
+    normal: { hp: 4, bossHP: 10, monsters: [5, 7, 8, 7, 7, 5, 5], items: [3, 2, 1], label: 'Normal' },
+    hard:   { hp: 3, bossHP: 12, monsters: [6, 8, 10, 8, 8, 5, 5], items: [2, 1, 1], label: 'Hard' }
   };
   var currentDiff = 'normal';
 
@@ -541,11 +575,17 @@ h1 {
   var BOSS_IDX = 9; // top-right corner
   var START_IDX = 34; // row 3, col 4 — near center
 
-  var XP_THRESHOLDS = [0, 3, 4, 5, 6];
-  var MAX_LEVEL = 5;
+  var XP_BASE = 3;
+  function xpForLevel(lv) { return XP_BASE + (lv - 1); }
 
   var cells, player, gameOver, msgTimer, startTime, totalMonsters;
-  var leaderboard = [];
+  var LB_KEY = 'dungeon_sweeper_lb';
+  var leaderboard = (function() {
+    try { return JSON.parse(localStorage.getItem(LB_KEY)) || []; } catch(e) { return []; }
+  })();
+  function saveLB() {
+    try { localStorage.setItem(LB_KEY, JSON.stringify(leaderboard)); } catch(e) {}
+  }
 
   // --- Web Audio SFX (no external files) ---
   var audioCtx = null;
@@ -707,12 +747,12 @@ h1 {
   }
 
   function canLevelUp() {
-    return player.level < MAX_LEVEL && player.xp >= XP_THRESHOLDS[player.level];
+    return player.xp >= xpForLevel(player.level);
   }
 
   window.doLevelUp = function() {
     if (!canLevelUp()) return;
-    player.xp -= XP_THRESHOLDS[player.level];
+    player.xp -= xpForLevel(player.level);
     player.level++;
     player.maxHp++;
     player.hp = player.maxHp;
@@ -794,10 +834,6 @@ h1 {
           setTimeout(function() { tileEl.classList.remove('flash'); }, 300);
         }
 
-        if (player.hp <= 0) {
-          endGame(false);
-          return;
-        }
         return;
       }
 
@@ -889,6 +925,7 @@ h1 {
       leaderboard.push({ diff: diffLabel, kills: player.kills, level: player.level, time: elapsed, timeStr: timeStr });
       leaderboard.sort(function(a, b) { return a.time - b.time; });
       if (leaderboard.length > 10) leaderboard.length = 10;
+      saveLB();
     }
 
     document.getElementById('end-banner').classList.add('show');
@@ -976,7 +1013,7 @@ h1 {
     for (i = 0; i < player.maxHp; i++) {
       h = document.createElement('span');
       h.className = 'heart-icon ' + (i < player.hp ? 'full' : 'empty');
-      h.textContent = '♥';
+      h.innerHTML = '♥<span class="heart-num">' + (i + 1) + '</span>';
       hw.appendChild(h);
     }
 
@@ -984,16 +1021,10 @@ h1 {
     starsEl = document.getElementById('xp-stars');
     starsEl.innerHTML = '';
 
-    if (player.level >= MAX_LEVEL) {
-      document.getElementById('xp-label').textContent = 'MAX';
-      totalStars = XP_THRESHOLDS[MAX_LEVEL - 1];
-      filledCount = totalStars;
-    } else {
-      xpNeeded = XP_THRESHOLDS[player.level];
-      document.getElementById('xp-label').textContent = player.xp + '/' + xpNeeded;
-      totalStars = xpNeeded;
-      filledCount = player.xp;
-    }
+    xpNeeded = xpForLevel(player.level);
+    document.getElementById('xp-label').textContent = player.xp + '/' + xpNeeded;
+    totalStars = xpNeeded;
+    filledCount = Math.min(player.xp, xpNeeded);
 
     for (si = 0; si < totalStars; si++) {
       d = document.createElement('div');
@@ -1002,7 +1033,16 @@ h1 {
       starsEl.appendChild(d);
     }
     document.getElementById('lv-badge').textContent = 'Lv.' + player.level;
-    document.getElementById('lvup-btn').style.display = canLevelUp() ? 'block' : 'none';
+
+    var avatar = document.getElementById('player-avatar');
+    var hint = document.getElementById('lvup-hint');
+    if (canLevelUp()) {
+      avatar.classList.add('can-lvup');
+      hint.style.display = 'block';
+    } else {
+      avatar.classList.remove('can-lvup');
+      hint.style.display = 'none';
+    }
   }
 
   function renderAll() {
