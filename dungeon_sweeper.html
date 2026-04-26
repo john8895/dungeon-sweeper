@@ -1,0 +1,1124 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<title>DungeonSweeper</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  background: #140e06;
+  color: #f0e8d0;
+  font-family: Georgia, 'Times New Roman', serif;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  padding: 16px;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+h1 {
+  font-size: 32px;
+  color: #f5c842;
+  letter-spacing: 3px;
+  margin-bottom: 12px;
+  text-shadow: 0 0 16px rgba(245,200,66,0.25);
+}
+
+#hud {
+  background: #231808;
+  border: 2px solid #5a4020;
+  border-radius: 6px;
+  padding: 12px 18px;
+  margin-bottom: 12px;
+  max-width: 820px;
+  width: 100%;
+}
+
+#hud-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+#lv-badge {
+  background: #4a3010;
+  border: 1px solid #f5c842;
+  border-radius: 4px;
+  padding: 4px 10px;
+  font-size: 15px;
+  color: #f5c842;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+#lvup-btn {
+  background: #2a6a10;
+  border: 2px solid #60e030;
+  border-radius: 4px;
+  padding: 4px 12px;
+  font-size: 14px;
+  font-weight: bold;
+  color: #e0ffc0;
+  white-space: nowrap;
+  flex-shrink: 0;
+  cursor: pointer;
+  animation: lvup-pulse 0.8s ease-in-out infinite alternate;
+}
+#lvup-btn:hover { background: #3a8a18; }
+@keyframes lvup-pulse {
+  0%   { box-shadow: 0 0 4px rgba(96,224,48,0.3); }
+  100% { box-shadow: 0 0 12px rgba(96,224,48,0.7); }
+}
+
+#hearts-wrap { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+
+.heart-icon {
+  font-size: 55px;
+  line-height: 1;
+  transition: opacity 0.2s;
+}
+.heart-icon.full { color: #e03030; }
+.heart-icon.empty { color: #3a2018; }
+
+#xp-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+#xp-label { font-size: 12px; color: #907850; flex-shrink: 0; }
+#xp-stars { display: flex; gap: 4px; flex-wrap: wrap; }
+
+.xp-diamond {
+  position: relative;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.xp-diamond .diamond-bg {
+  width: 24px;
+  height: 24px;
+  transform: rotate(45deg);
+  border-radius: 3px;
+}
+.xp-diamond.filled .diamond-bg {
+  background: #c8a832;
+  border: 1px solid #f5d860;
+  box-shadow: 0 0 4px rgba(245,200,66,0.4);
+}
+.xp-diamond.empty .diamond-bg {
+  background: #2a1e0a;
+  border: 1px solid #4a3820;
+}
+.xp-diamond .diamond-num {
+  position: absolute;
+  font-size: 12px;
+  font-weight: bold;
+  font-family: monospace;
+  color: #fff;
+  text-shadow: 0 1px 2px rgba(0,0,0,0.6);
+}
+.xp-diamond.empty .diamond-num {
+  color: #5a4828;
+}
+
+#msg {
+  display: none;
+}
+
+#grid {
+  display: grid;
+  grid-template-columns: repeat(10, 72px);
+  gap: 4px;
+  background: linear-gradient(180deg, #100a04 0%, #0c0804 50%, #080402 100%);
+  padding: 10px;
+  border: 3px solid #5a4020;
+  border-top-color: #6a5030;
+  border-bottom-color: #3a2010;
+  border-radius: 6px;
+  box-shadow:
+    0 4px 24px rgba(0,0,0,0.7),
+    inset 0 1px 2px rgba(255,255,255,0.03),
+    inset 0 -2px 4px rgba(0,0,0,0.3);
+}
+
+.tile {
+  width: 72px;
+  height: 72px;
+  border-radius: 5px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  transition: transform 0.08s, background 0.1s, box-shadow 0.1s;
+  cursor: default;
+}
+
+.tile.hidden {
+  background: linear-gradient(160deg, #7a6040 0%, #6a5030 40%, #584025 100%);
+  cursor: pointer;
+  border-top: 2px solid rgba(255,255,255,0.12);
+  border-left: 1px solid rgba(255,255,255,0.06);
+  border-bottom: 2px solid rgba(0,0,0,0.5);
+  border-right: 1px solid rgba(0,0,0,0.3);
+  box-shadow:
+    inset 0 1px 1px rgba(255,255,255,0.08),
+    0 2px 4px rgba(0,0,0,0.5);
+}
+.tile.hidden:hover {
+  background: linear-gradient(160deg, #8a7050 0%, #7a6038 40%, #685035 100%);
+  transform: translateY(-2px);
+  box-shadow:
+    inset 0 1px 1px rgba(255,255,255,0.1),
+    0 4px 8px rgba(0,0,0,0.5);
+}
+.tile.hidden:active {
+  transform: translateY(0);
+  box-shadow:
+    inset 0 2px 4px rgba(0,0,0,0.3);
+  border-top: 1px solid rgba(0,0,0,0.2);
+  border-bottom: 1px solid rgba(255,255,255,0.05);
+}
+
+.tile.open {
+  background: linear-gradient(160deg, #d4bc8a 0%, #c0a470 40%, #b09060 100%);
+  border-top: 1px solid rgba(255,255,255,0.1);
+  border-bottom: 2px solid rgba(0,0,0,0.25);
+  box-shadow:
+    inset 0 2px 6px rgba(0,0,0,0.25),
+    inset 0 -1px 0 rgba(255,255,255,0.05);
+}
+
+.tile.monster {
+  cursor: pointer;
+  border-top: 2px solid rgba(255,255,255,0.08);
+  border-bottom: 2px solid rgba(0,0,0,0.55);
+  box-shadow:
+    inset 0 1px 1px rgba(255,255,255,0.06),
+    0 2px 4px rgba(0,0,0,0.4),
+    0 0 10px rgba(200,30,20,0.2);
+}
+.tile.monster:hover {
+  transform: translateY(-2px);
+  filter: brightness(1.15);
+  box-shadow:
+    inset 0 1px 1px rgba(255,255,255,0.08),
+    0 4px 8px rgba(0,0,0,0.5),
+    0 0 14px rgba(200,30,20,0.3);
+}
+
+.tile.item-tile {
+  background: linear-gradient(160deg, #1a3a14 0%, #122a0c 40%, #0e2208 100%);
+  cursor: pointer;
+  border-top: 2px solid rgba(100,255,100,0.08);
+  border-bottom: 2px solid rgba(0,0,0,0.5);
+  box-shadow:
+    inset 0 1px 1px rgba(255,255,255,0.05),
+    0 2px 4px rgba(0,0,0,0.4),
+    0 0 10px rgba(40,160,30,0.2);
+}
+.tile.item-tile:hover {
+  transform: translateY(-2px);
+  filter: brightness(1.15);
+}
+
+.tile .sprite { font-size: 40px; line-height: 1; }
+.tile .hp-txt { font-size: 14px; color: #ff9090; font-weight: bold; font-family: monospace; }
+.tile .item-name { font-size: 11px; color: #90e080; font-weight: bold; font-family: monospace; line-height: 1; }
+.tile .xp-loot {
+  position: absolute;
+  bottom: 2px;
+  right: 5px;
+  font-size: 24px;
+  font-weight: bold;
+  font-family: monospace;
+  color: #f0d060;
+  text-shadow: 0 1px 3px rgba(0,0,0,0.7);
+  z-index: 3;
+}
+.tile .dead-x {
+  position: absolute;
+  font-size: 60px;
+  color: rgba(220,30,30,0.7);
+  font-weight: bold;
+  line-height: 1;
+  z-index: 2;
+  pointer-events: none;
+  text-shadow: 0 0 6px rgba(200,0,0,0.4);
+}
+
+.tile .adj {
+  position: absolute;
+  bottom: 3px;
+  left: 5px;
+  font-size: 18px;
+  font-weight: bold;
+  font-family: monospace;
+  opacity: 0.8;
+}
+
+.tile .big-num {
+  font-size: 36px;
+  font-weight: bold;
+  font-family: monospace;
+}
+
+.c-low    { color: #50e050; }
+.c-mid    { color: #e0e040; }
+.c-high   { color: #ff8020; }
+.c-danger { color: #ff3030; }
+
+
+/* End banner (inline, below grid) */
+#end-banner {
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  margin-top: 12px;
+  padding: 16px 24px;
+  background: #231808;
+  border: 3px solid #f5c842;
+  border-radius: 8px;
+}
+#end-banner.show { display: flex; }
+#ov-title {
+  font-size: 36px;
+  font-weight: bold;
+  text-align: center;
+  margin-bottom: 6px;
+  text-shadow: 0 0 20px rgba(245,200,66,0.35);
+  letter-spacing: 3px;
+}
+#ov-stats { font-size: 13px; color: #907850; }
+#restart {
+  background: #4a3010;
+  border: 2px solid #f5c842;
+  color: #f5c842;
+  font-family: inherit;
+  font-size: 22px;
+  padding: 14px 0;
+  border-radius: 8px;
+  cursor: pointer;
+  width: 350px;
+  height: 60px;
+}
+#restart:hover, #btn-menu:hover { background: #6a4818; }
+
+/* Start tile */
+.tile.start-tile {
+  background: linear-gradient(160deg, #2a5a8a 0%, #1a3a5a 40%, #102a48 100%);
+  cursor: pointer;
+  border-top: 2px solid rgba(100,180,255,0.2);
+  border-bottom: 2px solid rgba(0,0,0,0.5);
+  box-shadow:
+    inset 0 1px 1px rgba(150,210,255,0.1),
+    0 2px 4px rgba(0,0,0,0.4),
+    0 0 12px rgba(60,140,255,0.3);
+}
+.tile.start-tile:hover {
+  background: linear-gradient(160deg, #3a6a9a 0%, #2a4a6a 40%, #1a3a58 100%);
+  transform: translateY(-2px);
+  box-shadow:
+    inset 0 1px 1px rgba(150,210,255,0.15),
+    0 4px 8px rgba(0,0,0,0.5),
+    0 0 16px rgba(60,140,255,0.4);
+}
+.tile .start-dot {
+  font-size: 54px;
+  color: #60b0ff;
+  text-shadow: 0 0 12px rgba(60,140,255,0.6);
+}
+
+/* Boss tile */
+.tile.boss-tile {
+  background: linear-gradient(160deg, #7a1a10 0%, #5a0a06 40%, #400804 100%);
+  cursor: pointer;
+  border-top: 2px solid rgba(255,100,80,0.2);
+  border-bottom: 2px solid rgba(0,0,0,0.6);
+  border-left: 1px solid rgba(255,80,60,0.1);
+  border-right: 1px solid rgba(0,0,0,0.4);
+  box-shadow:
+    inset 0 1px 1px rgba(255,150,100,0.08),
+    0 2px 4px rgba(0,0,0,0.5),
+    0 0 14px rgba(255,40,20,0.3);
+}
+.tile.boss-tile:hover {
+  transform: translateY(-2px);
+  filter: brightness(1.15);
+  box-shadow:
+    inset 0 1px 1px rgba(255,150,100,0.1),
+    0 4px 8px rgba(0,0,0,0.5),
+    0 0 20px rgba(255,40,20,0.4);
+}
+.tile .boss-power {
+  font-size: 16px;
+  font-weight: bold;
+  font-family: monospace;
+  color: #ff6060;
+}
+.tile .crown {
+  position: absolute;
+  top: -2px;
+  right: 2px;
+  font-size: 20px;
+  animation: crown-pulse 0.6s ease-in-out infinite alternate;
+}
+@keyframes crown-pulse {
+  0%   { transform: scale(1); }
+  100% { transform: scale(1.15); }
+}
+
+/* Leaderboard (menu) */
+#menu-lb {
+  margin-top: 16px;
+  width: 100%;
+  max-width: 360px;
+}
+#menu-lb h3 {
+  color: #f5c842;
+  font-size: 16px;
+  margin-bottom: 8px;
+  text-align: center;
+  letter-spacing: 1px;
+}
+#menu-lb table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+  color: #c0a878;
+}
+#menu-lb th {
+  color: #907850;
+  font-weight: normal;
+  font-size: 11px;
+  padding: 4px 6px;
+  border-bottom: 1px solid #5a4020;
+  text-align: center;
+}
+#menu-lb td {
+  padding: 4px 6px;
+  border-bottom: 1px solid #2a1a0a;
+  text-align: center;
+}
+#menu-lb tr:first-child td { color: #f5c842; }
+#menu-lb .lb-empty { color: #5a4828; font-size: 12px; text-align: center; margin-top: 8px; }
+
+/* Damage flash */
+@keyframes dmg-flash {
+  0%   { box-shadow: 0 0 20px rgba(255,60,60,0.6); }
+  100% { box-shadow: none; }
+}
+.flash { animation: dmg-flash 0.3s ease-out; }
+
+@keyframes item-flash {
+  0%   { box-shadow: 0 0 20px rgba(60,255,60,0.6); }
+  100% { box-shadow: none; }
+}
+.item-flash { animation: item-flash 0.3s ease-out; }
+
+/* Difficulty menu */
+#diff-menu {
+  background: #231808;
+  border: 3px solid #5a4020;
+  border-radius: 8px;
+  padding: 30px 40px;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+}
+#diff-menu h2 {
+  color: #f5c842;
+  font-size: 20px;
+  margin: 0;
+  letter-spacing: 2px;
+}
+#diff-btns { display: flex; gap: 12px; }
+.diff-btn {
+  background: linear-gradient(160deg, #5a4020 0%, #3a2810 100%);
+  border: 2px solid #6a5030;
+  border-top-color: #7a6040;
+  border-bottom-color: #2a1808;
+  color: #f0e0c0;
+  font-family: inherit;
+  font-size: 16px;
+  padding: 12px 24px;
+  border-radius: 6px;
+  cursor: pointer;
+  min-width: 100px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.4);
+}
+.diff-btn:hover {
+  background: linear-gradient(160deg, #6a5030 0%, #4a3818 100%);
+  transform: translateY(-1px);
+  box-shadow: 0 3px 6px rgba(0,0,0,0.5);
+}
+.diff-btn small {
+  display: block;
+  font-size: 11px;
+  color: #907850;
+  margin-top: 4px;
+}
+</style>
+</head>
+<body>
+
+<div id="ov-title" style="display:none"></div>
+<h1 id="game-title">⚔ DungeonSweeper</h1>
+
+<div id="diff-menu">
+  <h2>Select Difficulty</h2>
+  <div id="diff-btns">
+    <button class="diff-btn" onclick="startWithDiff('easy')">Easy<small>HP 7 · Boss 6</small></button>
+    <button class="diff-btn" onclick="startWithDiff('normal')">Normal<small>HP 5 · Boss 8</small></button>
+    <button class="diff-btn" onclick="startWithDiff('hard')">Hard<small>HP 4 · Boss 10</small></button>
+  </div>
+  <div id="menu-lb"></div>
+</div>
+
+<div id="hud">
+  <div id="xp-row">
+    <div id="lv-badge">Lv.1</div>
+    <div id="lvup-btn" style="display:none" onclick="doLevelUp()">Level Up!</div>
+    <div id="xp-label">0 / 3 XP</div>
+    <div id="xp-stars"></div>
+  </div>
+  <div id="hud-row">
+    <div id="hearts-wrap"></div>
+  </div>
+  <div id="msg"></div>
+</div>
+
+<div id="grid"></div>
+
+
+<div id="end-banner">
+  <div id="ov-stats"></div>
+  <div style="display:flex;gap:16px;margin-top:8px;width:100%">
+    <button id="btn-menu" onclick="showMenu()" style="flex:1;background:#4a3010;border:2px solid #f5c842;color:#f5c842;font-family:inherit;font-size:22px;padding:14px 0;border-radius:8px;cursor:pointer">Menu</button>
+    <button id="restart" onclick="initGame()" style="flex:1">Retry</button>
+  </div>
+</div>
+
+<script>
+(function() {
+  var COLS = 10, ROWS = 8, TOTAL = COLS * ROWS;
+
+  var MONSTERS = [
+    { id: 'dragon',   emoji: '🐉', name: 'Dragon',   power: 5, count: 3,  bg: '#5a0a06' },
+    { id: 'ogre',     emoji: '👹', name: 'Ogre',     power: 4, count: 5,  bg: '#4a1a08' },
+    { id: 'skeleton', emoji: '💀', name: 'Skeleton', power: 3, count: 7,  bg: '#3a2808' },
+    { id: 'spider',   emoji: '🕷️', name: 'Spider',   power: 2, count: 6,  bg: '#2a1a3a' },
+    { id: 'bat',      emoji: '🦇', name: 'Bat',      power: 2, count: 6,  bg: '#28084a' },
+    { id: 'snake',    emoji: '🐍', name: 'Snake',    power: 1, count: 5,  bg: '#1a3018' },
+    { id: 'rat',      emoji: '🐀', name: 'Rat',      power: 1, count: 5,  bg: '#302810' }
+  ];
+
+  var ITEMS = [
+    { id: 'scroll', emoji: '❤️', name: 'Healing Scroll', heal: 2, xp: 0, count: 5 },
+    { id: 'pizza',  emoji: '🍕', name: 'Pizza',          heal: 1, xp: 0, count: 4 },
+    { id: 'chest',  emoji: '📦', name: 'Chest',          heal: 0, xp: 3, count: 3 }
+  ];
+
+  var DIFFICULTIES = {
+    easy:   { hp: 7, bossHP: 6, monsters: [2, 3, 5, 5, 5, 5, 5], items: [6, 5, 4], label: 'Easy' },
+    normal: { hp: 5, bossHP: 8, monsters: [3, 5, 7, 6, 6, 5, 5], items: [5, 4, 3], label: 'Normal' },
+    hard:   { hp: 4, bossHP: 10, monsters: [4, 6, 8, 7, 7, 4, 4], items: [4, 3, 2], label: 'Hard' }
+  };
+  var currentDiff = 'normal';
+
+  var BOSS = { id: 'boss', emoji: '🐲', name: 'Dragon King', power: 8, bg: '#5a0a06' };
+  var BOSS_IDX = 9; // top-right corner
+  var START_IDX = 34; // row 3, col 4 — near center
+
+  var XP_THRESHOLDS = [0, 3, 4, 5, 6];
+  var MAX_LEVEL = 5;
+
+  var cells, player, gameOver, msgTimer, startTime, totalMonsters;
+  var leaderboard = [];
+
+  // --- Web Audio SFX (no external files) ---
+  var audioCtx = null;
+  function getAudioCtx() {
+    if (!audioCtx) {
+      var AC = window.AudioContext || window.webkitAudioContext;
+      if (AC) audioCtx = new AC();
+    }
+    return audioCtx;
+  }
+
+  function playTone(freq, duration, type, vol, detune) {
+    var ctx = getAudioCtx();
+    if (!ctx) return;
+    var osc = ctx.createOscillator();
+    var gain = ctx.createGain();
+    osc.type = type || 'square';
+    osc.frequency.value = freq;
+    if (detune) osc.detune.value = detune;
+    gain.gain.value = vol || 0.12;
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + duration);
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start(ctx.currentTime);
+    osc.stop(ctx.currentTime + duration);
+  }
+
+  function playNoise(duration, vol) {
+    var ctx = getAudioCtx();
+    if (!ctx) return;
+    var bufSize = Math.floor(ctx.sampleRate * duration);
+    var buf = ctx.createBuffer(1, bufSize, ctx.sampleRate);
+    var data = buf.getChannelData(0);
+    for (var i = 0; i < bufSize; i++) data[i] = Math.random() * 2 - 1;
+    var src = ctx.createBufferSource();
+    src.buffer = buf;
+    var gain = ctx.createGain();
+    gain.gain.value = vol || 0.08;
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + duration);
+    src.connect(gain);
+    gain.connect(ctx.destination);
+    src.start(ctx.currentTime);
+  }
+
+  function sfx(name) {
+    try {
+      if (name === 'reveal') {
+        playTone(600, 0.06, 'square', 0.06);
+      } else if (name === 'monster_appear') {
+        playTone(180, 0.15, 'sawtooth', 0.1);
+        setTimeout(function() { playTone(120, 0.2, 'sawtooth', 0.08); }, 80);
+      } else if (name === 'combat') {
+        playNoise(0.12, 0.15);
+        playTone(200, 0.1, 'square', 0.1);
+        setTimeout(function() { playTone(140, 0.15, 'sawtooth', 0.08); }, 60);
+      } else if (name === 'item') {
+        playTone(520, 0.08, 'sine', 0.1);
+        setTimeout(function() { playTone(780, 0.1, 'sine', 0.1); }, 70);
+      } else if (name === 'levelup') {
+        playTone(440, 0.1, 'square', 0.08);
+        setTimeout(function() { playTone(554, 0.1, 'square', 0.08); }, 100);
+        setTimeout(function() { playTone(659, 0.1, 'square', 0.08); }, 200);
+        setTimeout(function() { playTone(880, 0.2, 'square', 0.1); }, 300);
+      } else if (name === 'win') {
+        playTone(523, 0.15, 'square', 0.1);
+        setTimeout(function() { playTone(659, 0.15, 'square', 0.1); }, 150);
+        setTimeout(function() { playTone(784, 0.15, 'square', 0.1); }, 300);
+        setTimeout(function() { playTone(1047, 0.3, 'square', 0.12); }, 450);
+      } else if (name === 'lose') {
+        playTone(300, 0.2, 'sawtooth', 0.1);
+        setTimeout(function() { playTone(250, 0.2, 'sawtooth', 0.1); }, 200);
+        setTimeout(function() { playTone(200, 0.3, 'sawtooth', 0.1); }, 400);
+        setTimeout(function() { playTone(150, 0.5, 'sawtooth', 0.08); }, 600);
+      }
+    } catch(e) {}
+  }
+
+  // --- BGM (random pick per game, loop same track) ---
+  var bgmTracks = ['bgm.mp3', 'bgm2.mp3', 'bgm3.mp3'];
+  var bgm = null;
+  var bgmStarted = false;
+
+  function startBGM() {
+    if (bgmStarted) return;
+    bgmStarted = true;
+    var pick = bgmTracks[Math.floor(Math.random() * bgmTracks.length)];
+    bgm = new Audio(pick);
+    bgm.volume = 0.3;
+    bgm.loop = true;
+    bgm.play().catch(function() {});
+  }
+  document.addEventListener('click', function() { startBGM(); }, { once: true });
+
+  function shuffle(arr) {
+    var i, j, t;
+    for (i = arr.length - 1; i > 0; i--) {
+      j = Math.floor(Math.random() * (i + 1));
+      t = arr[i]; arr[i] = arr[j]; arr[j] = t;
+    }
+    return arr;
+  }
+
+  function neighbors(idx) {
+    var r = Math.floor(idx / COLS), c = idx % COLS;
+    var res = [];
+    var dr, dc, nr, nc;
+    for (dr = -1; dr <= 1; dr++) {
+      for (dc = -1; dc <= 1; dc++) {
+        if (dr === 0 && dc === 0) continue;
+        nr = r + dr; nc = c + dc;
+        if (nr >= 0 && nr < ROWS && nc >= 0 && nc < COLS) {
+          res.push(nr * COLS + nc);
+        }
+      }
+    }
+    return res;
+  }
+
+  function sumAdjHP(idx) {
+    var nbrs = neighbors(idx);
+    var sum = 0, i;
+    for (i = 0; i < nbrs.length; i++) {
+      var c = cells[nbrs[i]];
+      if (c.content && (c.content.type === 'monster' || c.content.type === 'boss')) {
+        sum += c.content.def.power;
+      }
+    }
+    return sum;
+  }
+
+  function recalcAllAdj() {
+    var i;
+    for (i = 0; i < TOTAL; i++) {
+      cells[i].adjHP = sumAdjHP(i);
+    }
+  }
+
+  function numClass(n) {
+    if (n <= 0) return '';
+    if (n <= 6) return 'c-low';
+    if (n <= 16) return 'c-mid';
+    if (n <= 35) return 'c-high';
+    return 'c-danger';
+  }
+
+  function showMsg(text) {
+    document.getElementById('msg').textContent = text;
+    clearTimeout(msgTimer);
+    if (text) {
+      msgTimer = setTimeout(function() {
+        if (!gameOver) document.getElementById('msg').textContent = '';
+      }, 3000);
+    }
+  }
+
+
+  function gainXP(amount) {
+    player.xp += amount;
+  }
+
+  function canLevelUp() {
+    return player.level < MAX_LEVEL && player.xp >= XP_THRESHOLDS[player.level];
+  }
+
+  window.doLevelUp = function() {
+    if (!canLevelUp()) return;
+    player.xp -= XP_THRESHOLDS[player.level];
+    player.level++;
+    player.maxHp++;
+    player.hp = player.maxHp;
+    sfx('levelup');
+    showMsg('✨ Level Up! Lv.' + player.level + ' — HP full!');
+    renderAll();
+  };
+
+  function formatTime() {
+    var elapsed = Math.floor((Date.now() - startTime) / 1000);
+    var m = Math.floor(elapsed / 60);
+    var s = elapsed % 60;
+    return m + ':' + (s < 10 ? '0' : '') + s;
+  }
+
+  function clickCell(idx) {
+    if (gameOver) return;
+    var cell = cells[idx];
+
+    // Start tile — reveal 8 neighbors (reveal only, no auto-fight)
+    if (cell.content && cell.content.type === 'start') {
+      sfx('reveal');
+      cell.content = null;
+      var nbrs = neighbors(idx);
+      var ni;
+      for (ni = 0; ni < nbrs.length; ni++) {
+        var nc = cells[nbrs[ni]];
+        if (!nc.revealed && !(nc.content && nc.content.type === 'boss')) {
+          nc.revealed = true;
+        }
+      }
+      recalcAllAdj();
+      renderAll();
+      return;
+    }
+
+    // Boss tile — fight (die if not enough HP)
+    if (cell.content && cell.content.type === 'boss') {
+      var b = cell.content.def;
+      player.hp = Math.max(0, player.hp - b.power);
+      player.kills++;
+      sfx('combat');
+      cell.content = { type: 'defeated', def: b };
+      recalcAllAdj();
+      renderAll();
+      if (player.hp < 0) {
+        endGame(false);
+      } else {
+        showMsg('👑 ' + b.name + ' defeated!');
+        endGame(true);
+      }
+      return;
+    }
+
+    // State 1: Hidden → reveal
+    if (!cell.revealed) {
+      cell.revealed = true;
+
+      if (cell.content && cell.content.type === 'item') {
+        sfx('reveal');
+        showMsg(cell.content.def.emoji + ' ' + cell.content.def.name);
+        renderAll();
+        return;
+      }
+
+      if (cell.content && cell.content.type === 'monster') {
+        var m = cell.content.def;
+        player.hp = Math.max(0, player.hp - m.power);
+        player.kills++;
+        sfx('combat');
+        cell.content = { type: 'defeated', def: m };
+        recalcAllAdj();
+        renderAll();
+
+        var gridEl = document.getElementById('grid');
+        var tileEl = gridEl.children[idx];
+        if (tileEl) {
+          tileEl.classList.add('flash');
+          setTimeout(function() { tileEl.classList.remove('flash'); }, 300);
+        }
+
+        if (player.hp <= 0) {
+          endGame(false);
+          return;
+        }
+        return;
+      }
+
+      sfx('reveal');
+      if (cell.adjHP === 0) {
+        floodReveal(idx);
+      }
+      renderAll();
+      return;
+    }
+
+    // State 2: Defeated monster → collect XP
+    if (cell.content && cell.content.type === 'defeated') {
+      var md = cell.content.def;
+      sfx('item');
+      gainXP(md.power);
+      showMsg(md.emoji + ' +' + md.power + ' XP');
+      cell.content = null;
+      renderAll();
+      return;
+    }
+
+    // State 3: Revealed item → consume
+    if (cell.content && cell.content.type === 'item') {
+      var it = cell.content.def;
+      sfx('item');
+      if (it.id === 'pizza') {
+        var halfHeal = Math.ceil(player.maxHp / 2);
+        player.hp = Math.min(player.hp + halfHeal, player.maxHp);
+      } else if (it.heal > 0) {
+        player.hp = Math.min(player.hp + it.heal, player.maxHp);
+      }
+      if (it.xp > 0) {
+        gainXP(it.xp);
+        showMsg(it.emoji + ' ' + it.name + ' — +' + it.xp + ' XP');
+      }
+      cell.content = null;
+      renderAll();
+    }
+  }
+
+  function floodReveal(startIdx) {
+    var queue = [startIdx];
+    var visited = {};
+    visited[startIdx] = true;
+    var cur, nbrs, i, n, nc;
+
+    while (queue.length > 0) {
+      cur = queue.shift();
+      cells[cur].revealed = true;
+
+      if (cells[cur].adjHP === 0) {
+        nbrs = neighbors(cur);
+        for (i = 0; i < nbrs.length; i++) {
+          n = nbrs[i];
+          if (visited[n]) continue;
+          nc = cells[n];
+          if (nc.revealed) continue;
+          if (nc.content) continue; // Don't auto-reveal monsters/items
+          visited[n] = true;
+          queue.push(n);
+        }
+      }
+    }
+  }
+
+  function endGame(won) {
+    gameOver = true;
+    var timeStr = formatTime();
+    var elapsed = Math.floor((Date.now() - startTime) / 1000);
+
+    // Reveal all cells
+    var ci;
+    for (ci = 0; ci < TOTAL; ci++) {
+      cells[ci].revealed = true;
+    }
+
+    // Show title above grid, stats + button below
+    document.getElementById('game-title').style.display = 'none';
+    document.getElementById('ov-title').textContent = won ? '👑 VICTORY' : '💀 GAME OVER';
+    document.getElementById('ov-title').style.color = won ? '#f5c842' : '#ff6060';
+    document.getElementById('ov-title').style.display = 'block';
+    document.getElementById('ov-stats').textContent =
+      'Lv.' + player.level + '  |  Slain: ' + player.kills + '/' + totalMonsters + '  |  ' + timeStr;
+
+    // Leaderboard (victory only)
+    if (won) {
+      var diffLabel = DIFFICULTIES[currentDiff].label;
+      leaderboard.push({ diff: diffLabel, kills: player.kills, level: player.level, time: elapsed, timeStr: timeStr });
+      leaderboard.sort(function(a, b) { return a.time - b.time; });
+      if (leaderboard.length > 10) leaderboard.length = 10;
+    }
+
+    document.getElementById('end-banner').classList.add('show');
+    renderAll();
+    sfx(won ? 'win' : 'lose');
+  }
+
+  function renderGrid() {
+    var gridEl = document.getElementById('grid');
+    gridEl.innerHTML = '';
+    var i, cell, tile, m, a, numEl;
+
+    for (i = 0; i < TOTAL; i++) {
+      cell = cells[i];
+      tile = document.createElement('div');
+      tile.className = 'tile';
+
+      if (cell.content && cell.content.type === 'start') {
+        // Start tile — blue dot
+        tile.classList.add('start-tile');
+        tile.innerHTML = '<span class="start-dot">●</span>';
+        tile.onclick = (function(idx) { return function() { clickCell(idx); }; })(i);
+
+      } else if (cell.content && cell.content.type === 'boss') {
+        // Boss tile — always visible
+        var bd = cell.content.def;
+        tile.classList.add('boss-tile');
+        tile.innerHTML = '<span class="sprite">' + bd.emoji + '</span>' +
+          '<span class="boss-power">♥ ' + bd.power + '</span>';
+        if (player.hp >= bd.power) {
+          tile.innerHTML += '<span class="crown">👑</span>';
+        }
+        tile.onclick = (function(idx) { return function() { clickCell(idx); }; })(i);
+
+      } else if (!cell.revealed) {
+        // Hidden tile
+        tile.classList.add('hidden');
+        tile.onclick = (function(idx) { return function() { clickCell(idx); }; })(i);
+
+      } else if (cell.content && cell.content.type === 'defeated') {
+        // Defeated monster — click to collect XP
+        m = cell.content.def;
+        tile.classList.add('monster');
+        tile.style.background = m.bg;
+        tile.style.opacity = '0.7';
+        tile.innerHTML =
+          '<span class="dead-x">✕</span>' +
+          '<span class="sprite">' + m.emoji + '</span>' +
+          '<span class="xp-loot">' + m.power + '</span>';
+        tile.onclick = (function(idx) { return function() { clickCell(idx); }; })(i);
+
+      } else if (cell.content && cell.content.type === 'item') {
+        // Revealed item — click to consume
+        tile.classList.add('item-tile');
+        tile.style.cursor = 'pointer';
+        tile.innerHTML =
+          '<span class="sprite">' + cell.content.def.emoji + '</span>';
+        if (cell.adjHP > 0) {
+          a = document.createElement('span');
+          a.className = 'adj ' + numClass(cell.adjHP);
+          a.textContent = cell.adjHP;
+          tile.appendChild(a);
+        }
+        tile.onclick = (function(idx) { return function() { clickCell(idx); }; })(i);
+
+      } else {
+        // Revealed empty / consumed item / fought monster
+        tile.classList.add('open');
+        if (cell.adjHP > 0) {
+          numEl = document.createElement('span');
+          numEl.className = 'big-num ' + numClass(cell.adjHP);
+          numEl.textContent = cell.adjHP;
+          tile.appendChild(numEl);
+        }
+      }
+
+      gridEl.appendChild(tile);
+    }
+  }
+
+  function renderHUD() {
+    var hw = document.getElementById('hearts-wrap');
+    hw.innerHTML = '';
+    var i, h;
+    for (i = 0; i < player.maxHp; i++) {
+      h = document.createElement('span');
+      h.className = 'heart-icon ' + (i < player.hp ? 'full' : 'empty');
+      h.textContent = '♥';
+      hw.appendChild(h);
+    }
+
+    var xpNeeded, filledCount, starsEl, d, si, totalStars;
+    starsEl = document.getElementById('xp-stars');
+    starsEl.innerHTML = '';
+
+    if (player.level >= MAX_LEVEL) {
+      document.getElementById('xp-label').textContent = 'MAX';
+      totalStars = XP_THRESHOLDS[MAX_LEVEL - 1];
+      filledCount = totalStars;
+    } else {
+      xpNeeded = XP_THRESHOLDS[player.level];
+      document.getElementById('xp-label').textContent = player.xp + '/' + xpNeeded;
+      totalStars = xpNeeded;
+      filledCount = player.xp;
+    }
+
+    for (si = 0; si < totalStars; si++) {
+      d = document.createElement('div');
+      d.className = 'xp-diamond ' + (si < filledCount ? 'filled' : 'empty');
+      d.innerHTML = '<div class="diamond-bg"></div><span class="diamond-num">' + (si + 1) + '</span>';
+      starsEl.appendChild(d);
+    }
+    document.getElementById('lv-badge').textContent = 'Lv.' + player.level;
+    document.getElementById('lvup-btn').style.display = canLevelUp() ? 'block' : 'none';
+  }
+
+  function renderAll() {
+    renderGrid();
+    renderHUD();
+  }
+
+  function renderMenuLB() {
+    var el = document.getElementById('menu-lb');
+    if (leaderboard.length === 0) {
+      el.innerHTML = '';
+      return;
+    }
+    var html = '<h3>🏆 Leaderboard</h3>';
+    html += '<table><tr><th>#</th><th>Diff</th><th>Lv</th><th>Kills</th><th>Time</th></tr>';
+    var ci;
+    for (ci = 0; ci < leaderboard.length; ci++) {
+      var e = leaderboard[ci];
+      html += '<tr><td>' + (ci + 1) + '</td><td>' + e.diff + '</td><td>' + e.level + '</td><td>' + e.kills + '</td><td>' + e.timeStr + '</td></tr>';
+    }
+    html += '</table>';
+    el.innerHTML = html;
+  }
+
+  window.showMenu = function() {
+    document.getElementById('end-banner').classList.remove('show');
+    document.getElementById('ov-title').style.display = 'none';
+    document.getElementById('hud').style.display = 'none';
+    document.getElementById('grid').style.display = 'none';
+    document.getElementById('diff-menu').style.display = 'flex';
+    document.getElementById('game-title').style.display = 'block';
+    renderMenuLB();
+  };
+
+  window.startWithDiff = function(diff) {
+    currentDiff = diff;
+    document.getElementById('diff-menu').style.display = 'none';
+    document.getElementById('hud').style.display = 'block';
+    document.getElementById('grid').style.display = 'grid';
+    initGame();
+  };
+
+  window.initGame = function() {
+    document.getElementById('end-banner').classList.remove('show');
+    document.getElementById('ov-title').style.display = 'none';
+    document.getElementById('game-title').style.display = 'block';
+    gameOver = false;
+    clearTimeout(msgTimer);
+    startTime = Date.now();
+    totalMonsters = 0;
+
+    var diff = DIFFICULTIES[currentDiff];
+    BOSS.power = diff.bossHP;
+    player = { hp: diff.hp, maxHp: diff.hp, xp: 0, level: 1, kills: 0 };
+
+    // Build content pool using difficulty monster counts
+    var contents = [];
+    var mi, mj, ii, ij;
+    for (mi = 0; mi < MONSTERS.length; mi++) {
+      var mCount = diff.monsters[mi];
+      for (mj = 0; mj < mCount; mj++) {
+        contents.push({ type: 'monster', def: MONSTERS[mi] });
+        totalMonsters++;
+      }
+    }
+    for (ii = 0; ii < ITEMS.length; ii++) {
+      var iCount = diff.items[ii];
+      for (ij = 0; ij < iCount; ij++) {
+        contents.push({ type: 'item', def: ITEMS[ii] });
+      }
+    }
+    var fillCount = TOTAL - 2; // minus boss + start
+    while (contents.length < fillCount) {
+      contents.push(null);
+    }
+    shuffle(contents);
+
+    cells = [];
+    var ci = 0;
+    var i;
+    for (i = 0; i < TOTAL; i++) {
+      if (i === BOSS_IDX) {
+        cells.push({
+          idx: i,
+          revealed: true,
+          content: { type: 'boss', def: BOSS },
+          adjHP: 0
+        });
+        totalMonsters++;
+      } else if (i === START_IDX) {
+        cells.push({
+          idx: i,
+          revealed: true,
+          content: { type: 'start' },
+          adjHP: 0
+        });
+      } else {
+        cells.push({
+          idx: i,
+          revealed: false,
+          content: contents[ci],
+          adjHP: 0
+        });
+        ci++;
+      }
+    }
+    recalcAllAdj();
+
+    showMsg('Click the blue dot to begin!');
+    renderAll();
+  };
+
+  // Start with menu visible, game hidden
+  document.getElementById('hud').style.display = 'none';
+  document.getElementById('grid').style.display = 'none';
+})();
+</script>
+</body>
+</html>
